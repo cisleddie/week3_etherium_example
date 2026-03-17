@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blockchain Lab #3</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --neon-blue: #00d4ff;
+    --neon-green: #00ff9d;
+    --neon-purple: #b14aff;
+    --neon-orange: #ff6b35;
+    --bg-deep: #050810;
+    --bg-card: #0a0f1e;
+    --bg-card2: #0d1428;
+    --border-glow: rgba(0,212,255,0.2);
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg-deep);
+    color: #e2e8f0;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,212,255,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(177,74,255,0.06) 0%, transparent 50%);
+  }
+  .mono { font-family: 'Space Mono', monospace; }
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glow);
+    border-radius: 16px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--neon-blue), transparent);
+    opacity: 0.5;
+  }
+  .card:hover { border-color: rgba(0,212,255,0.4); }
+  .card-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--neon-blue);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1.2rem;
+    border-radius: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    outline: none;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-blue {
+    background: linear-gradient(135deg, #0066cc, #0099ff);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(0,153,255,0.3);
+  }
+  .btn-blue:hover:not(:disabled) { box-shadow: 0 0 30px rgba(0,153,255,0.5); transform: translateY(-1px); }
+  .btn-green {
+    background: linear-gradient(135deg, #006644, #00cc88);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(0,204,136,0.3);
+  }
+  .btn-green:hover:not(:disabled) { box-shadow: 0 0 30px rgba(0,204,136,0.5); transform: translateY(-1px); }
+  .btn-purple {
+    background: linear-gradient(135deg, #6600cc, #9933ff);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(153,51,255,0.3);
+  }
+  .btn-purple:hover:not(:disabled) { box-shadow: 0 0 30px rgba(153,51,255,0.5); transform: translateY(-1px); }
+  .btn-gray {
+    background: rgba(255,255,255,0.07);
+    color: #94a3b8;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .btn-gray:hover:not(:disabled) { background: rgba(255,255,255,0.12); color: #e2e8f0; }
+  .btn-orange {
+    background: linear-gradient(135deg, #cc4400, #ff6b35);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(255,107,53,0.3);
+  }
+  .btn-sm { padding: 0.35rem 0.8rem; font-size: 0.75rem; }
+  .inp {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    color: #e2e8f0;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .inp:focus { border-color: var(--neon-blue); box-shadow: 0 0 0 3px rgba(0,212,255,0.1); }
+  .inp::placeholder { color: #4a5568; }
+  .badge-online { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--neon-green); box-shadow: 0 0 8px var(--neon-green); animation: pulse 2s infinite; }
+  .badge-offline { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #4a5568; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .info-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.82rem; }
+  .info-row:last-child { border-bottom: none; }
+  .info-label { color: #64748b; font-size: 0.75rem; }
+  .info-value { color: #e2e8f0; font-family: 'Space Mono', monospace; font-size: 0.78rem; word-break: break-all; text-align: right; max-width: 60%; }
+  .result-box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1rem; margin-top: 0.75rem; }
+  .nonce-big { font-family: 'Space Mono', monospace; font-size: 2.5rem; font-weight: 700; color: #818cf8; line-height: 1; }
+  .sig-val { font-family: 'Space Mono', monospace; font-size: 0.7rem; color: #c084fc; word-break: break-all; line-height: 1.5; }
+  .net-btn { padding: 0.35rem 0.9rem; border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 0.72rem; font-weight: 700; cursor: pointer; border: 1px solid; transition: all 0.2s; }
+  .net-btn.active-sep { background: rgba(59,130,246,0.2); border-color: #3b82f6; color: #93c5fd; }
+  .net-btn.active-base { background: rgba(16,185,129,0.2); border-color: #10b981; color: #6ee7b7; }
+  .net-btn.active-giwa { background: rgba(139,92,246,0.2); border-color: #8b5cf6; color: #c4b5fd; }
+  .net-btn.inactive { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); color: #64748b; }
+  .net-btn:hover { opacity: 0.85; }
+  .tree-line-v { width: 2px; height: 32px; background: linear-gradient(to bottom, #334155, #475569); margin: 0 auto; }
+  .tree-h-container { display: flex; align-items: flex-start; justify-content: center; position: relative; }
+  .tree-h-container::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 25%; right: 25%;
+    height: 2px;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  }
+  .net-node { border-radius: 12px; padding: 0.8rem 1.2rem; text-align: center; min-width: 160px; }
+  .net-node-sep { background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.4); }
+  .net-node-base { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.4); }
+  .net-node-giwa { background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.4); }
+  .tree-branch { width: 2px; height: 32px; margin: 0 auto; }
+  .branch-base { background: #10b981; }
+  .branch-giwa { background: #8b5cf6; }
+  .alert { padding: 0.6rem 0.9rem; border-radius: 8px; font-size: 0.8rem; margin-top: 0.6rem; }
+  .alert-warn { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); color: #fbbf24; }
+  .alert-err { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #f87171; }
+  .alert-ok { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); color: #6ee7b7; }
+  .alert-info { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); color: #a5b4fc; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .faucet-card { background: var(--bg-card2); border-radius: 12px; padding: 1rem; border: 1px solid rgba(255,255,255,0.06); }
+  .faucet-link { display: block; padding: 0.35rem 0; font-size: 0.78rem; font-family: 'Space Mono', monospace; text-decoration: none; transition: color 0.2s; }
+  .faucet-link:hover { text-decoration: underline; }
+  select.inp { cursor: pointer; }
+  .gas-mini { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .gas-item { background: rgba(255,107,53,0.07); border: 1px solid rgba(255,107,53,0.2); border-radius: 8px; padding: 0.6rem; text-align: center; }
+  .gas-num { font-family: 'Space Mono', monospace; font-size: 1rem; font-weight: 700; color: #fb923c; }
+  .gas-lbl { font-size: 0.68rem; color: #94a3b8; margin-top: 2px; }
+  header { position: sticky; top: 0; z-index: 100; }
+  .header-bg { background: rgba(5,8,16,0.85); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(0,212,255,0.1); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-bg">
+    <div style="max-width:1200px;margin:0 auto;padding:0.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
+      <div>
+        <div style="font-size:1.2rem;font-weight:800;letter-spacing:-0.02em;">
+          <span style="color:var(--neon-blue);">⬡</span> Blockchain <span style="color:var(--neon-blue);">Lab #3</span>
+        </div>
+        <div id="headerSubtitle" class="mono" style="font-size:0.68rem;color:#64748b;margin-top:1px;">Ethereum Testnet Explorer</div>
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+        <button onclick="switchNetwork('sepolia')" id="netBtn-sepolia" class="net-btn inactive">Sepolia</button>
+        <button onclick="switchNetwork('baseSepolia')" id="netBtn-baseSepolia" class="net-btn inactive">Base Sepolia</button>
+        <button onclick="switchNetwork('giwaSepolia')" id="netBtn-giwaSepolia" class="net-btn inactive">GIWA Sepolia</button>
+        <div style="display:flex;align-items:center;gap:0.4rem;margin-left:0.5rem;">
+          <span id="connBadge" class="badge-offline"></span>
+          <span id="connLabel" class="mono" style="font-size:0.7rem;color:#64748b;">미연결</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main style="max-width:1200px;margin:0 auto;padding:1.5rem;">
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1.25rem;">
+
+    <!-- CARD 1: 지갑 연결 -->
+    <div class="card">
+      <div class="card-title">◈ Card 1 — 지갑 연결</div>
+      <button class="btn btn-blue" onclick="connectWallet()" id="connectBtn">
+        🦊 MetaMask 연결
+      </button>
+      <div id="metamaskWarn" style="display:none;" class="alert alert-warn" style="margin-top:0.75rem;">
+        ⚠️ MetaMask가 설치되지 않았습니다. <a href="https://metamask.io" target="_blank" style="text-decoration:underline;">설치하러 가기 →</a>
+      </div>
+      <div id="walletInfo" style="display:none;margin-top:1rem;">
+        <div class="result-box">
+          <div class="info-row"><span class="info-label">주소</span><span class="info-value" id="walletAddr">—</span></div>
+          <div class="info-row"><span class="info-label">ETH 잔액</span><span class="info-value" id="walletBal">—</span></div>
+          <div class="info-row"><span class="info-label">Nonce</span><span class="info-value" id="walletNonce">—</span></div>
+          <div class="info-row"><span class="info-label">네트워크</span><span class="info-value" id="walletNet">—</span></div>
+        </div>
+        <div id="faucetWarn" style="display:none;" class="alert alert-warn">
+          💧 잔액이 0입니다. Faucet에서 ETH를 받아오세요.
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 2: ETH 송금 -->
+    <div class="card">
+      <div class="card-title">◈ Card 2 — ETH 송금</div>
+      <div style="display:flex;flex-direction:column;gap:0.6rem;">
+        <div>
+          <div style="font-size:0.72rem;color:#64748b;margin-bottom:0.3rem;">받는 주소</div>
+          <input class="inp" id="sendTo" placeholder="0x..." />
+        </div>
+        <div>
+          <div style="font-size:0.72rem;color:#64748b;margin-bottom:0.3rem;">금액 (ETH)</div>
+          <input class="inp" id="sendAmt" type="number" value="0.001" step="0.001" min="0" />
+        </div>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-gray btn-sm" id="previewBtn" onclick="previewTx()" disabled>🔍 미리보기</button>
+          <button class="btn btn-orange btn-sm" id="sendBtn" onclick="sendTx()" disabled>🚀 송금 실행</button>
+        </div>
+      </div>
+      <div id="previewBox" style="display:none;" class="result-box">
+        <div class="info-row"><span class="info-label">현재 Nonce</span><span class="info-value" id="previewNonce">—</span></div>
+        <div class="info-row"><span class="info-label">예상 Gas Limit</span><span class="info-value">21,000</span></div>
+      </div>
+      <div id="sendResult" style="display:none;margin-top:0.75rem;"></div>
+      <div id="sendMsg" style="display:none;" class="alert" style="margin-top:0.6rem;"></div>
+    </div>
+
+    <!-- CARD 3: 트랜잭션 추적 + 서명 -->
+    <div class="card" style="grid-column:span 2;">
+      <div class="card-title">◈ Card 3 — 트랜잭션 추적 & 서명 검증</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;">
+        <!-- Left: TX Search -->
+        <div>
+          <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+            <input class="inp" id="txHashInput" placeholder="0x... TX Hash 입력" onkeydown="if(event.key==='Enter')trackTx()" />
+            <div style="display:flex;gap:0.4rem;align-items:center;">
+              <select class="inp" id="trackNet" style="width:auto;font-size:0.72rem;">
+                <option value="sepolia">Sepolia</option>
+                <option value="baseSepolia">Base Sepolia</option>
+                <option value="giwaSepolia">GIWA Sepolia</option>
+              </select>
+              <button class="btn btn-blue btn-sm" onclick="trackTx()">추적</button>
+            </div>
+          </div>
+          <div id="txBasic" style="display:none;"></div>
+        </div>
+        <!-- Right: Nonce/Gas/Sig -->
+        <div>
+          <div id="txNonce" style="display:none;"></div>
+          <div id="txGas" style="display:none;margin-top:0.75rem;"></div>
+          <div id="txSig" style="display:none;margin-top:0.75rem;"></div>
+        </div>
+      </div>
+      <div id="txMsg" style="display:none;margin-top:0.5rem;" class="alert"></div>
+    </div>
+
+    <!-- CARD 4: 네트워크 구조 다이어그램 -->
+    <div class="card">
+      <div class="card-title">◈ Card 4 — L1 / L2 네트워크 구조</div>
+      <div style="text-align:center;padding:1rem 0;">
+        <!-- L1 -->
+        <div style="display:flex;justify-content:center;">
+          <div class="net-node net-node-sep">
+            <div style="font-size:0.65rem;color:#60a5fa;letter-spacing:0.1em;font-weight:700;">L1 TESTNET</div>
+            <div style="font-size:1rem;font-weight:800;color:#93c5fd;margin:0.2rem 0;">Sepolia</div>
+            <div class="mono" style="font-size:0.68rem;color:#475569;">Chain ID: 11155111</div>
+          </div>
+        </div>
+        <!-- vertical -->
+        <div class="tree-line-v"></div>
+        <!-- horizontal branches -->
+        <div class="tree-h-container" style="padding-top:0;">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding-top:0;">
+            <div class="tree-branch branch-base"></div>
+            <div class="net-node net-node-base" style="margin-top:0;">
+              <div style="font-size:0.65rem;color:#34d399;letter-spacing:0.1em;font-weight:700;">L2 ROLLUP</div>
+              <div style="font-size:1rem;font-weight:800;color:#6ee7b7;margin:0.2rem 0;">Base Sepolia</div>
+              <div class="mono" style="font-size:0.68rem;color:#475569;">Chain ID: 84532</div>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding-top:0;">
+            <div class="tree-branch branch-giwa"></div>
+            <div class="net-node net-node-giwa">
+              <div style="font-size:0.65rem;color:#a78bfa;letter-spacing:0.1em;font-weight:700;">L2 ROLLUP</div>
+              <div style="font-size:1rem;font-weight:800;color:#c4b5fd;margin:0.2rem 0;">GIWA Sepolia</div>
+              <div class="mono" style="font-size:0.68rem;color:#475569;">Chain ID: 91342</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:1.25rem;padding:0.75rem;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+          <p style="font-size:0.78rem;color:#64748b;line-height:1.5;">Sepolia는 이더리움 L1 테스트넷, Base / GIWA는 <span style="color:#a78bfa;">OP Stack L2 롤업</span> 테스트넷입니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 5: Bridge -->
+    <div class="card">
+      <div class="card-title">◈ Card 5 — Bridge</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <!-- Bridge Links + Notes -->
+        <div>
+          <div style="font-size:0.72rem;color:#64748b;margin-bottom:0.5rem;font-weight:700;">브릿지 링크</div>
+          <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1rem;">
+            <div style="background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:0.6rem;display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:0.78rem;font-weight:700;color:#6ee7b7;">Superbridge</div>
+                <div style="font-size:0.68rem;color:#64748b;">Base Sepolia ↔ Sepolia</div>
+              </div>
+              <a href="https://superbridge.app" target="_blank" class="btn btn-green btn-sm" style="text-decoration:none;">이동 →</a>
+            </div>
+            <div style="background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:0.6rem;display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:0.78rem;font-weight:700;color:#c4b5fd;">GIWA Bridge</div>
+                <div style="font-size:0.68rem;color:#64748b;">GIWA Sepolia ↔ Sepolia</div>
+              </div>
+              <a href="#" target="_blank" class="btn btn-purple btn-sm" style="text-decoration:none;">이동 →</a>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:0.75rem;border:1px solid rgba(255,255,255,0.06);">
+            <div style="font-size:0.7rem;font-weight:700;color:#94a3b8;margin-bottom:0.5rem;">브릿지 교육 노트</div>
+            <div style="display:flex;flex-direction:column;gap:0.35rem;">
+              <div style="font-size:0.75rem;">
+                <span style="color:#6ee7b7;font-weight:700;">Deposit (L1→L2)</span>
+                <span style="color:#64748b;"> Lock → Mint</span>
+              </div>
+              <div style="font-size:0.75rem;">
+                <span style="color:#c4b5fd;font-weight:700;">Withdraw (L2→L1)</span>
+                <span style="color:#64748b;"> Burn → Unlock</span>
+              </div>
+              <div class="alert alert-warn" style="font-size:0.72rem;margin-top:0.3rem;">
+                ⚠️ L2→L1 출금은 <strong>7일 챌린지 기간</strong> 필요
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Bridge TX Analyzer -->
+        <div>
+          <div style="font-size:0.72rem;color:#64748b;margin-bottom:0.5rem;font-weight:700;">Bridge TX 분석</div>
+          <div style="display:flex;flex-direction:column;gap:0.5rem;">
+            <select class="inp" id="bridgeNet" style="font-size:0.78rem;">
+              <option value="sepolia">Sepolia (L1)</option>
+              <option value="baseSepolia">Base Sepolia (L2)</option>
+              <option value="giwaSepolia">GIWA Sepolia (L2)</option>
+            </select>
+            <input class="inp" id="bridgeHash" placeholder="TX Hash 입력" />
+            <button class="btn btn-blue btn-sm" onclick="analyzeBridgeTx()">🔎 분석</button>
+          </div>
+          <div id="bridgeResult" style="margin-top:0.75rem;display:none;"></div>
+          <div id="bridgeMsg" style="display:none;margin-top:0.5rem;" class="alert"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end grid -->
+
+  <!-- FAUCET SECTION -->
+  <div style="margin-top:1.5rem;">
+    <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:#64748b;margin-bottom:0.75rem;">테스트넷 Faucet 목록</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;">
+      <div class="faucet-card">
+        <div style="font-size:0.8rem;font-weight:700;color:#93c5fd;margin-bottom:0.5rem;">🔵 Sepolia</div>
+        <a href="https://sepoliafaucet.com" target="_blank" class="faucet-link" style="color:#60a5fa;">sepoliafaucet.com</a>
+        <a href="https://faucet.quicknode.com/ethereum/sepolia" target="_blank" class="faucet-link" style="color:#60a5fa;">QuickNode Faucet</a>
+        <a href="https://www.alchemy.com/faucets/ethereum-sepolia" target="_blank" class="faucet-link" style="color:#60a5fa;">Alchemy Faucet</a>
+        <a href="https://faucets.chain.link/sepolia" target="_blank" class="faucet-link" style="color:#60a5fa;">Chainlink Faucet</a>
+      </div>
+      <div class="faucet-card">
+        <div style="font-size:0.8rem;font-weight:700;color:#6ee7b7;margin-bottom:0.5rem;">🟢 Base Sepolia</div>
+        <a href="https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet" target="_blank" class="faucet-link" style="color:#34d399;">Coinbase Faucet</a>
+        <a href="https://faucet.quicknode.com/base/sepolia" target="_blank" class="faucet-link" style="color:#34d399;">QuickNode Base</a>
+        <a href="https://www.alchemy.com/faucets/base-sepolia" target="_blank" class="faucet-link" style="color:#34d399;">Alchemy Base</a>
+      </div>
+      <div class="faucet-card">
+        <div style="font-size:0.8rem;font-weight:700;color:#c4b5fd;margin-bottom:0.5rem;">🟣 GIWA Sepolia</div>
+        <a href="#" target="_blank" class="faucet-link" style="color:#a78bfa;">GIWA Faucet (TBA)</a>
+        <a href="#" target="_blank" class="faucet-link" style="color:#a78bfa;">GIWA Explorer (TBA)</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="margin-top:2rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,0.05);text-align:center;">
+    <p id="footerText" class="mono" style="font-size:0.7rem;color:#334155;">Blockchain Lab #3 · Ethereum Sepolia Testnet</p>
+  </div>
+</main>
+
+<script>
+// ─── NETWORK CONFIG ─────────────────────────────────────────────────────────
+const NETWORKS = {
+  sepolia: {
+    name: 'Sepolia',
+    chainId: '0xaa36a7',
+    chainIdDec: 11155111,
+    rpcUrls: ['https://rpc.sepolia.org','https://ethereum-sepolia.blockpi.network/v1/rpc/public'],
+    blockExplorerUrls: ['https://sepolia.etherscan.io'],
+    nativeCurrency: { name: 'Sepolia ETH', symbol: 'ETH', decimals: 18 },
+    faucet: 'https://sepoliafaucet.com',
+    subtitle: 'Ethereum L1 Testnet',
+  },
+  baseSepolia: {
+    name: 'Base Sepolia',
+    chainId: '0x14a34',
+    chainIdDec: 84532,
+    rpcUrls: ['https://sepolia.base.org'],
+    blockExplorerUrls: ['https://sepolia.basescan.org'],
+    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+    faucet: 'https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet',
+    subtitle: 'Base L2 Rollup Testnet (OP Stack)',
+  },
+  giwaSepolia: {
+    name: 'GIWA Sepolia',
+    chainId: '0x16476',
+    chainIdDec: 91342,
+    rpcUrls: ['https://rpc.giwa.network'],
+    blockExplorerUrls: ['https://explorer.giwa.network'],
+    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+    faucet: '#',
+    subtitle: 'GIWA L2 Rollup Testnet (OP Stack)',
+  },
+};
+
+let provider = null;
+let signer = null;
+let walletAddress = null;
+let currentNetwork = 'sepolia';
+
+function escapeHtml(s){
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── NETWORK SWITCH ──────────────────────────────────────────────────────────
+async function switchNetwork(netKey) {
+  currentNetwork = netKey;
+  const net = NETWORKS[netKey];
+  document.getElementById('headerSubtitle').textContent = net.subtitle;
+  document.getElementById('footerText').textContent = `Blockchain Lab #3 · ${net.name}`;
+  ['sepolia','baseSepolia','giwaSepolia'].forEach(k => {
+    const b = document.getElementById(`netBtn-${k}`);
+    if(k === netKey) {
+      b.className = `net-btn active-${k === 'sepolia' ? 'sep' : k === 'baseSepolia' ? 'base' : 'giwa'}`;
+    } else {
+      b.className = 'net-btn inactive';
+    }
+  });
+  if(window.ethereum && walletAddress) {
+    try {
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: net.chainId }] });
+    } catch(err) {
+      if(err.code === 4902) {
+        try {
+          await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: net.chainId, chainName: net.name, rpcUrls: net.rpcUrls, blockExplorerUrls: net.blockExplorerUrls, nativeCurrency: net.nativeCurrency }] });
+        } catch(e2) { console.error(e2); }
+      }
+    }
+    refreshWallet();
+  }
+}
+
+// ─── WALLET ──────────────────────────────────────────────────────────────────
+async function connectWallet() {
+  if(!window.ethereum) {
+    document.getElementById('metamaskWarn').style.display = 'block';
+    return;
+  }
+  const btn = document.getElementById('connectBtn');
+  btn.innerHTML = '<span class="spinner"></span> 연결 중...';
+  btn.disabled = true;
+  try {
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+    walletAddress = await signer.getAddress();
+    await refreshWallet();
+    document.getElementById('walletInfo').style.display = 'block';
+    document.getElementById('connBadge').className = 'badge-online';
+    document.getElementById('connLabel').textContent = '연결됨';
+    document.getElementById('previewBtn').disabled = false;
+    document.getElementById('sendBtn').disabled = false;
+    btn.innerHTML = '✅ 연결됨';
+  } catch(e) {
+    btn.innerHTML = '🦊 MetaMask 연결';
+    btn.disabled = false;
+    console.error(e);
+  }
+}
+
+async function refreshWallet() {
+  if(!walletAddress || !provider) return;
+  try {
+    const bal = await provider.getBalance(walletAddress);
+    const nonce = await provider.getTransactionCount(walletAddress);
+    const net = await provider.getNetwork();
+    const balEth = parseFloat(ethers.formatEther(bal));
+    document.getElementById('walletAddr').textContent = walletAddress.slice(0,8)+'...'+walletAddress.slice(-6);
+    document.getElementById('walletBal').textContent = balEth.toFixed(6) + ' ETH';
+    document.getElementById('walletNonce').textContent = nonce;
+    document.getElementById('walletNet').textContent = `Chain ${net.chainId}`;
+    document.getElementById('faucetWarn').style.display = balEth === 0 ? 'block' : 'none';
+  } catch(e) { console.error(e); }
+}
+
+if(window.ethereum) {
+  window.ethereum.on('accountsChanged', async (accounts) => {
+    if(accounts.length > 0) { walletAddress = accounts[0]; await refreshWallet(); }
+  });
+  window.ethereum.on('chainChanged', () => { window.location.reload(); });
+}
+
+// ─── SEND TX ─────────────────────────────────────────────────────────────────
+async function previewTx() {
+  if(!signer) return;
+  const nonce = await provider.getTransactionCount(walletAddress);
+  document.getElementById('previewNonce').textContent = nonce;
+  document.getElementById('previewBox').style.display = 'block';
+}
+
+async function sendTx() {
+  const toAddr = document.getElementById('sendTo').value.trim();
+  const amt = document.getElementById('sendAmt').value;
+  const msgEl = document.getElementById('sendMsg');
+  const resultEl = document.getElementById('sendResult');
+
+  function showMsg(type, text) {
+    msgEl.className = `alert alert-${type}`;
+    msgEl.textContent = text;
+    msgEl.style.display = 'block';
+  }
+
+  if(!toAddr || !amt) return showMsg('err', '주소와 금액을 입력하세요.');
+  try { ethers.getAddress(toAddr); } catch { return showMsg('err', '올바르지 않은 이더리움 주소입니다.'); }
+  if(parseFloat(amt) <= 0) return showMsg('err', '금액은 0보다 커야 합니다.');
+
+  msgEl.style.display = 'none';
+  resultEl.style.display = 'none';
+  document.getElementById('sendBtn').innerHTML = '<span class="spinner"></span> 처리 중...';
+  document.getElementById('sendBtn').disabled = true;
+
+  try {
+    const tx = await signer.sendTransaction({ to: toAddr, value: ethers.parseEther(amt) });
+    showMsg('info', `⏳ 트랜잭션 전송됨. 블록 포함 대기 중... Hash: ${tx.hash.slice(0,12)}...`);
+    const receipt = await tx.wait();
+    const fee = receipt.gasUsed * receipt.gasPrice;
+    const net = NETWORKS[currentNetwork];
+    resultEl.innerHTML = `
+      <div class="result-box">
+        <div class="info-row"><span class="info-label">TX Hash</span><span class="info-value" style="font-size:0.7rem;">${escapeHtml(receipt.hash)}</span></div>
+        <div class="info-row"><span class="info-label">Nonce</span><span class="info-value">${tx.nonce}</span></div>
+        <div class="info-row"><span class="info-label">Gas Used</span><span class="info-value">${receipt.gasUsed.toLocaleString()}</span></div>
+        <div class="info-row"><span class="info-label">수수료</span><span class="info-value">${ethers.formatEther(fee)} ETH</span></div>
+        <div class="info-row"><span class="info-label">상태</span><span class="info-value" style="color:#6ee7b7;">${receipt.status === 1 ? '✅ 성공' : '❌ 실패'}</span></div>
+        <div style="margin-top:0.5rem;"><a href="${net.blockExplorerUrls[0]}/tx/${receipt.hash}" target="_blank" style="color:var(--neon-blue);font-size:0.78rem;text-decoration:none;">🔗 Explorer에서 보기 →</a></div>
+      </div>`;
+    resultEl.style.display = 'block';
+    msgEl.style.display = 'none';
+    refreshWallet();
+  } catch(e) {
+    if(e.code === 4001 || e.code === 'ACTION_REJECTED') showMsg('warn', '⚠️ 사용자가 트랜잭션을 거절했습니다.');
+    else if(e.message && e.message.includes('insufficient funds')) showMsg('err', '❌ 잔액이 부족합니다.');
+    else showMsg('err', '❌ ' + (e.message || '트랜잭션 오류'));
+  }
+  document.getElementById('sendBtn').innerHTML = '🚀 송금 실행';
+  document.getElementById('sendBtn').disabled = false;
+}
+
+// ─── TRACK TX ────────────────────────────────────────────────────────────────
+async function trackTx() {
+  const hash = document.getElementById('txHashInput').value.trim();
+  const netKey = document.getElementById('trackNet').value;
+  const msgEl = document.getElementById('txMsg');
+  if(!hash) { showTxMsg('warn', 'TX Hash를 입력하세요.'); return; }
+  showTxMsg('info', '<span class="spinner"></span> 조회 중...');
+  ['txBasic','txNonce','txGas','txSig'].forEach(id => document.getElementById(id).style.display='none');
+
+  const net = NETWORKS[netKey];
+  let rpcProvider;
+  try {
+    rpcProvider = new ethers.JsonRpcProvider(net.rpcUrls[0]);
+  } catch(e) { showTxMsg('err','RPC 연결 실패'); return; }
+
+  try {
+    const [tx, receipt] = await Promise.all([
+      rpcProvider.getTransaction(hash),
+      rpcProvider.getTransactionReceipt(hash).catch(() => null)
+    ]);
+    if(!tx) { showTxMsg('err','❌ 트랜잭션을 찾을 수 없습니다.'); return; }
+
+    msgEl.style.display = 'none';
+
+    // Basic Info
+    const explorerBase = net.blockExplorerUrls[0];
+    document.getElementById('txBasic').innerHTML = `
+      <div style="font-size:0.68rem;color:#64748b;margin-bottom:0.4rem;font-weight:700;">기본 정보</div>
+      <div class="result-box" style="background:rgba(255,255,255,0.03);">
+        <div class="info-row"><span class="info-label">From</span><span class="info-value">${escapeHtml(tx.from?.slice(0,10)+'...')}</span></div>
+        <div class="info-row"><span class="info-label">To</span><span class="info-value">${escapeHtml(tx.to?.slice(0,10)+'...' || 'Contract')}</span></div>
+        <div class="info-row"><span class="info-label">Value</span><span class="info-value">${ethers.formatEther(tx.value)} ETH</span></div>
+        <div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:${receipt?.status===1?'#6ee7b7':'#f87171'}">${receipt ? (receipt.status===1?'✅ 성공':'❌ 실패') : '⏳ 대기'}</span></div>
+        <div style="margin-top:0.5rem;"><a href="${explorerBase}/tx/${hash}" target="_blank" style="color:var(--neon-blue);font-size:0.75rem;">🔗 Explorer →</a></div>
+      </div>`;
+    document.getElementById('txBasic').style.display = 'block';
+
+    // Nonce
+    document.getElementById('txNonce').innerHTML = `
+      <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.3);border-radius:10px;padding:0.75rem;">
+        <div style="font-size:0.65rem;color:#818cf8;font-weight:700;margin-bottom:0.4rem;">NONCE</div>
+        <div class="nonce-big">${tx.nonce}</div>
+        <div style="font-size:0.72rem;color:#64748b;margin-top:0.4rem;">이 트랜잭션의 일련번호입니다. 리플레이 공격을 방지합니다.</div>
+      </div>`;
+    document.getElementById('txNonce').style.display = 'block';
+
+    // Gas
+    const gasUsed = receipt?.gasUsed || BigInt(0);
+    const gasPrice = receipt?.gasPrice || tx.gasPrice || BigInt(0);
+    const fee = gasUsed * gasPrice;
+    document.getElementById('txGas').innerHTML = `
+      <div style="background:rgba(255,107,53,0.07);border:1px solid rgba(255,107,53,0.25);border-radius:10px;padding:0.75rem;">
+        <div style="font-size:0.65rem;color:#fb923c;font-weight:700;margin-bottom:0.6rem;">GAS</div>
+        <div class="gas-mini">
+          <div class="gas-item"><div class="gas-num">${tx.gasLimit?.toLocaleString()}</div><div class="gas-lbl">Gas Limit</div></div>
+          <div class="gas-item"><div class="gas-num">${gasUsed ? gasUsed.toLocaleString() : '—'}</div><div class="gas-lbl">Gas Used</div></div>
+          <div class="gas-item"><div class="gas-num" style="font-size:0.85rem;">${ethers.formatUnits(gasPrice,'gwei').slice(0,6)}</div><div class="gas-lbl">Gas Price (Gwei)</div></div>
+          <div class="gas-item"><div class="gas-num" style="font-size:0.85rem;">${fee ? parseFloat(ethers.formatEther(fee)).toFixed(8) : '—'}</div><div class="gas-lbl">수수료 (ETH)</div></div>
+        </div>
+        <div style="font-size:0.7rem;color:#64748b;margin-top:0.5rem;">Gas는 EVM 연산 비용입니다. 스팸 방지와 검증자 보상 역할.</div>
+      </div>`;
+    document.getElementById('txGas').style.display = 'block';
+
+    // Signature
+    const sig = tx.signature;
+    if(sig) {
+      document.getElementById('txSig').innerHTML = `
+        <div style="background:rgba(192,132,252,0.07);border:1px solid rgba(192,132,252,0.25);border-radius:10px;padding:0.75rem;">
+          <div style="font-size:0.65rem;color:#c084fc;font-weight:700;margin-bottom:0.5rem;">SIGNATURE (ECDSA)</div>
+          <div style="margin-bottom:0.4rem;"><span style="font-size:0.68rem;color:#64748b;">r: </span><div class="sig-val">${escapeHtml(sig.r)}</div></div>
+          <div style="margin-bottom:0.4rem;"><span style="font-size:0.68rem;color:#64748b;">s: </span><div class="sig-val">${escapeHtml(sig.s)}</div></div>
+          <div style="margin-bottom:0.6rem;"><span style="font-size:0.68rem;color:#64748b;">v: </span><span class="sig-val">${escapeHtml(String(sig.v))}</span></div>
+          <button class="btn btn-purple btn-sm" onclick="verifySig('${escapeHtml(hash)}', '${netKey}')">🔑 서명 검증 (ecrecover)</button>
+          <div id="sigVerifyResult" style="margin-top:0.6rem;"></div>
+        </div>`;
+      document.getElementById('txSig').style.display = 'block';
+    }
+
+    // store for verify
+    window._lastTx = tx;
+  } catch(e) {
+    showTxMsg('err','❌ 조회 오류: ' + (e.message||e));
+  }
+}
+
+async function verifySig(hash, netKey) {
+  const resEl = document.getElementById('sigVerifyResult');
+  resEl.innerHTML = '<span class="spinner"></span> 검증 중...';
+  try {
+    const tx = window._lastTx;
+    if(!tx) { resEl.innerHTML = '<div class="alert alert-err">TX 데이터 없음</div>'; return; }
+    const rebuilt = ethers.Transaction.from(tx);
+    const recovered = rebuilt.from;
+    const match = recovered?.toLowerCase() === tx.from?.toLowerCase();
+    resEl.innerHTML = match
+      ? `<div class="alert alert-ok">✅ 서명 검증 성공<br><span class="mono" style="font-size:0.7rem;">${escapeHtml(recovered)}</span><br><span style="font-size:0.7rem;color:#64748b;">서명에서 복원된 주소가 From과 일치합니다.</span></div>`
+      : `<div class="alert alert-err">❌ 서명 불일치<br><span class="mono" style="font-size:0.7rem;">복원: ${escapeHtml(recovered)}</span></div>`;
+  } catch(e) {
+    resEl.innerHTML = `<div class="alert alert-err">❌ 검증 오류: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function showTxMsg(type, html) {
+  const el = document.getElementById('txMsg');
+  el.className = `alert alert-${type}`;
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
+// ─── BRIDGE TX ANALYZER ──────────────────────────────────────────────────────
+async function analyzeBridgeTx() {
+  const hash = document.getElementById('bridgeHash').value.trim();
+  const netKey = document.getElementById('bridgeNet').value;
+  const msgEl = document.getElementById('bridgeMsg');
+  const resEl = document.getElementById('bridgeResult');
+  if(!hash) { msgEl.className='alert alert-warn'; msgEl.textContent='TX Hash를 입력하세요.'; msgEl.style.display='block'; return; }
+  msgEl.className='alert alert-info'; msgEl.innerHTML='<span class="spinner"></span> 분석 중...'; msgEl.style.display='block';
+  resEl.style.display='none';
+
+  const net = NETWORKS[netKey];
+  try {
+    const rpc = new ethers.JsonRpcProvider(net.rpcUrls[0]);
+    const [tx, receipt] = await Promise.all([rpc.getTransaction(hash), rpc.getTransactionReceipt(hash).catch(()=>null)]);
+    if(!tx) { msgEl.textContent='트랜잭션을 찾을 수 없습니다.'; return; }
+
+    const isL2 = netKey !== 'sepolia';
+    const direction = isL2 ? 'L2 → L1 (Withdraw)' : 'L1 → L2 (Deposit)';
+    const hasData = tx.data && tx.data !== '0x';
+    const gasUsed = receipt?.gasUsed || BigInt(0);
+    const gasPrice = receipt?.gasPrice || tx.gasPrice || BigInt(0);
+    const fee = gasUsed * gasPrice;
+
+    msgEl.style.display = 'none';
+    resEl.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:0.5rem;">
+        <div class="result-box">
+          <div class="info-row"><span class="info-label">From</span><span class="info-value">${escapeHtml(tx.from?.slice(0,10)+'...')}</span></div>
+          <div class="info-row"><span class="info-label">To</span><span class="info-value">${escapeHtml(tx.to?.slice(0,10)+'...'||'Contract')}</span></div>
+          <div class="info-row"><span class="info-label">Value</span><span class="info-value">${ethers.formatEther(tx.value)} ETH</span></div>
+          <div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:${receipt?.status===1?'#6ee7b7':'#f87171'}">${receipt?(receipt.status===1?'✅ 성공':'❌ 실패'):'⏳ 대기'}</span></div>
+          <div class="info-row"><span class="info-label">Nonce</span><span class="info-value">${tx.nonce}</span></div>
+          <div style="margin-top:0.4rem;"><a href="${net.blockExplorerUrls[0]}/tx/${hash}" target="_blank" style="color:var(--neon-blue);font-size:0.75rem;">🔗 Explorer →</a></div>
+        </div>
+        <div style="background:rgba(255,107,53,0.07);border:1px solid rgba(255,107,53,0.2);border-radius:8px;padding:0.6rem;">
+          <div style="font-size:0.68rem;color:#fb923c;font-weight:700;margin-bottom:0.3rem;">GAS</div>
+          <div class="info-row"><span class="info-label">Gas Used</span><span class="info-value">${gasUsed.toLocaleString()}</span></div>
+          <div class="info-row"><span class="info-label">수수료</span><span class="info-value">${fee ? parseFloat(ethers.formatEther(fee)).toFixed(8) : '—'} ETH</span></div>
+        </div>
+        ${tx.signature ? `<div style="background:rgba(192,132,252,0.07);border:1px solid rgba(192,132,252,0.2);border-radius:8px;padding:0.6rem;">
+          <div style="font-size:0.68rem;color:#c084fc;font-weight:700;margin-bottom:0.3rem;">SIGNATURE</div>
+          <div style="font-size:0.7rem;color:#64748b;">r: <span class="sig-val">${escapeHtml(tx.signature.r?.slice(0,20))}...</span></div>
+          <div style="font-size:0.7rem;color:#64748b;">s: <span class="sig-val">${escapeHtml(tx.signature.s?.slice(0,20))}...</span></div>
+          <div style="font-size:0.7rem;color:#64748b;">v: <span class="sig-val">${tx.signature.v}</span></div>
+        </div>` : ''}
+        <div style="background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.2);border-radius:8px;padding:0.6rem;">
+          <div style="font-size:0.68rem;color:var(--neon-blue);font-weight:700;margin-bottom:0.3rem;">브릿지 분석</div>
+          <div class="info-row"><span class="info-label">방향</span><span class="info-value" style="color:#93c5fd;">${direction}</span></div>
+          <div class="info-row"><span class="info-label">컨트랙트 상호작용</span><span class="info-value">${hasData ? '✅ 있음' : '—'}</span></div>
+          ${isL2 ? '<div style="margin-top:0.3rem;" class="alert alert-warn" style="font-size:0.72rem;">⚠️ L2→L1 출금: 7일 챌린지 기간이 필요합니다.</div>' : '<div style="margin-top:0.3rem;font-size:0.72rem;color:#64748b;">L1→L2 Deposit: 일반적으로 수 분 내 완료됩니다.</div>'}
+        </div>
+      </div>`;
+    resEl.style.display = 'block';
+  } catch(e) {
+    msgEl.className='alert alert-err'; msgEl.textContent='❌ 분석 오류: '+(e.message||e); msgEl.style.display='block';
+  }
+}
+
+// Init
+switchNetwork('sepolia');
+</script>
+</body>
+</html>
